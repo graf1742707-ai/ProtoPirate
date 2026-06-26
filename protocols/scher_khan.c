@@ -172,32 +172,34 @@ void* subghz_protocol_encoder_scher_khan_alloc(SubGhzEnvironment* environment) {
 SubGhzProtocolStatus subghz_protocol_encoder_scher_khan_deserialize(void* context, FlipperFormat* flipper_format) {
     furi_check(context);
     SubGhzProtocolEncoderScherKhan* instance = context;
-    SubGhzProtocolStatus ret = subghz_block_generic_deserialize(&instance->generic, flipper_format);
+    
+    flipper_format_read_uint32(flipper_format, FF_SERIAL, &instance->generic.serial, 1);
+    flipper_format_read_uint32(flipper_format, FF_BTN, &instance->generic.btn, 1);
+    flipper_format_read_uint32(flipper_format, FF_CNT, &instance->generic.cnt, 1);
 
-    if(ret == SubGhzProtocolStatusOk) {
-        instance->encoder.is_running = false;
+    instance->encoder.is_running = false;
+    
+    instance->generic.data_count_bit = 51; 
+    instance->generic.cnt++; 
+    
+    instance->generic.data = scher_khan_generate_magic_code(
+        instance->generic.serial, 
+        instance->generic.btn, 
+        instance->generic.cnt
+    );
 
-        instance->generic.data_count_bit = 51; 
-        instance->generic.cnt++; 
-        
-        instance->generic.data = scher_khan_generate_magic_code(
-            instance->generic.serial, 
-            instance->generic.btn, 
-            instance->generic.cnt
-        );
+    flipper_format_insert_or_update_uint32(flipper_format, FF_BIT, &instance->generic.data_count_bit, 1);
+    flipper_format_insert_or_update_uint32(flipper_format, FF_CNT, (uint32_t*)&instance->generic.cnt, 1);
+    
+    char key_str[20];
+    snprintf(key_str, sizeof(key_str), "%016llX", instance->generic.data);
+    flipper_format_insert_or_update_string_cstr(flipper_format, FF_KEY, key_str);
 
-        flipper_format_insert_or_update_uint32(flipper_format, FF_BIT, &instance->generic.data_count_bit, 1);
-        flipper_format_insert_or_update_uint32(flipper_format, FF_CNT, (uint32_t*)&instance->generic.cnt, 1);
-        
-        char key_str[20];
-        snprintf(key_str, sizeof(key_str), "%016llX", instance->generic.data);
-        flipper_format_insert_or_update_string_cstr(flipper_format, FF_KEY, key_str);
+    instance->encoder.upload = pp_shared_upload_slab_get();
+    subghz_protocol_encoder_scher_khan_get_upload(instance);
+    instance->encoder.is_running = true;
 
-        instance->encoder.upload = pp_shared_upload_slab_get();
-        subghz_protocol_encoder_scher_khan_get_upload(instance);
-        instance->encoder.is_running = true;
-    }
-    return ret;
+    return SubGhzProtocolStatusOk;
 }
 
 #endif
@@ -258,4 +260,3 @@ void subghz_protocol_decoder_scher_khan_feed(void* context, bool level, uint32_t
     case ScherKhanDecoderStepCheckPreambula:
         if(level) {
             if((DURATION_DIFF(duration, subghz_protocol_scher_khan_const.te_short * 2) <
-                subghz_protocol_scher_khan_const.te_delta) ||
