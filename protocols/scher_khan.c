@@ -173,14 +173,12 @@ SubGhzProtocolStatus subghz_protocol_encoder_scher_khan_deserialize(void* contex
     furi_check(context);
     SubGhzProtocolEncoderScherKhan* instance = context;
     
-    // Читаем сохраненные значения из файла ключа
     flipper_format_read_uint32(flipper_format, FF_SERIAL, &instance->generic.serial, 1);
     flipper_format_read_uint32(flipper_format, FF_BTN, &instance->generic.btn, 1);
     flipper_format_read_uint32(flipper_format, FF_CNT, &instance->generic.cnt, 1);
 
     instance->encoder.is_running = false;
     
-    // Принудительно выставляем 51 бит для генерации 342 позиций
     instance->generic.data_count_bit = 51; 
     instance->generic.cnt++; 
     
@@ -261,3 +259,4 @@ void subghz_protocol_decoder_scher_khan_feed(void* context, bool level, uint32_t
         break;
     case ScherKhanDecoderStepCheckPreambula:
         if(level) {
+            if((DURATION_DIFF(duration, subghz_protocol_scher_khan_const.te_short * 2) <
